@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import graphviz
 
 from db import (
     init_db,
@@ -45,36 +44,45 @@ def name_of(pid):
     return p[1] if p else "?"
 
 
-def bracket_graphviz(matches):
+def bracket_dot(matches):
     """
+    Restituisce una stringa DOT per st.graphviz_chart(dot).
     matches: list tuples (id, round, slot, p1_id, p2_id, p1_score, p2_score, winner_id, status)
     """
     # ✅ Filtro: non mostrare match vuoti (None vs None) che appaiono come BYE vs BYE
     matches = [m for m in matches if not (m[3] is None and m[4] is None)]
 
-    g = graphviz.Digraph()
-    g.attr(rankdir="LR")
+    lines = []
+    lines.append("digraph G {")
+    lines.append('rankdir="LR";')
+    lines.append("node [shape=box];")
 
     # nodes
     for m in matches:
         mid, rnd, slot, p1, p2, s1, s2, win, status = m
         p1n, p2n = name_of(p1), name_of(p2)
+
         score_txt = ""
         if status == "DONE":
-            score_txt = f"\n{s1} - {s2}"
-        label = f"R{rnd} · M{slot}\n{p1n} vs {p2n}{score_txt}"
+            score_txt = f"\\n{s1} - {s2}"
+
+        label = f"R{rnd} · M{slot}\\n{p1n} vs {p2n}{score_txt}"
+        label = label.replace('"', '\\"')  # sicurezza su doppi apici
         node_id = f"r{rnd}s{slot}"
-        g.node(node_id, label=label, shape="box")
+
+        lines.append(f'{node_id} [label="{label}"];')
 
     # edges: from round r slot s -> round r+1 slot ceil(s/2)
     for m in matches:
         _, rnd, slot, *_ = m
         node_id = f"r{rnd}s{slot}"
-        next_node = f"r{rnd+1}s{(slot+1)//2}"
-        if any(mm[1] == rnd + 1 and mm[2] == (slot + 1) // 2 for mm in matches):
-            g.edge(node_id, next_node)
+        next_r = rnd + 1
+        next_s = (slot + 1) // 2
+        if any(mm[1] == next_r and mm[2] == next_s for mm in matches):
+            lines.append(f"{node_id} -> r{next_r}s{next_s};")
 
-    return g
+    lines.append("}")
+    return "\n".join(lines)
 
 
 def is_admin():
@@ -97,7 +105,7 @@ def is_admin():
     return st.session_state.admin_ok
 
 
-# --- HEADER LOGOS (punto 5, compatto e mobile-friendly) ---
+# --- HEADER LOGOS (immagine unica, compatta e mobile-friendly) ---
 st.markdown(
     """
     <style>
@@ -128,8 +136,8 @@ with tab_dashboard:
         if not matches:
             st.info("Nessun bracket ancora generato. Vai su Admin → Genera bracket.")
         else:
-            g = bracket_graphviz(matches)
-            st.graphviz_chart(g)
+            dot = bracket_dot(matches)
+            st.graphviz_chart(dot)
 
     with col2:
         st.subheader("Classifica")
