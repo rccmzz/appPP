@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os
 
 from db import (
     init_db,
@@ -96,7 +97,7 @@ def is_admin():
         st.markdown("### 🔒 Admin")
         pwd = st.text_input("Password admin", type="password")
         if st.button("Login"):
-            if pwd and pwd == st.secrets.get("ADMIN_PASSWORD", ""):
+            if pwd and pwd == os.getenv("ADMIN_PASSWORD", ""):
                 st.session_state.admin_ok = True
                 st.success("Login OK")
             else:
